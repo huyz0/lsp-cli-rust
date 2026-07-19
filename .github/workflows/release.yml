@@ -118,9 +118,29 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
 
+  # The `secrets` context can't be referenced directly in a job-level `if:`
+  # (GitHub rejects the whole workflow file at parse time if it is —
+  # confirmed live: `Unrecognized named-value: 'secrets'`). This job routes
+  # around that by resolving presence into a step output first, which
+  # `needs.check-secrets.outputs.*` downstream jobs' `if:` can reference.
+  check-secrets:
+    name: Check publishing secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has_homebrew: ${{ steps.check.outputs.has_homebrew }}
+      has_winget: ${{ steps.check.outputs.has_winget }}
+    steps:
+      - id: check
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          echo "has_homebrew=$([ -n "$HOMEBREW_TAP_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_winget=$([ -n "$WINGET_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   homebrew:
     name: Update Homebrew formula
-    needs: release
+    needs: [release, check-secrets]
     runs-on: ubuntu-latest
     # One-time setup this job depends on (not something this workflow can
     # do for you): create huyz0/homebrew-tap (done), then add a
@@ -128,7 +148,7 @@ jobs:
     # with `contents:write` on huyz0/homebrew-tap, since the default
     # GITHUB_TOKEN only has access to *this* repo. Skips quietly instead of
     # failing every release when that secret hasn't been added yet.
-    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    if: needs.check-secrets.outputs.has_homebrew == 'true'
     env:
       GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
@@ -211,7 +231,7 @@ jobs:
 
   winget:
     name: Update winget manifest
-    needs: release
+    needs: [release, check-secrets]
     runs-on: windows-latest
     # One-time setup: create a fine-grained PAT with access to submit PRs
     # against microsoft/winget-pkgs (see
@@ -220,7 +240,7 @@ jobs:
     # needs the package to pass Microsoft's manual manifest validation
     # before winget-pkgs accepts it — that review is outside this repo's
     # control. Skips quietly until the secret exists.
-    if: ${{ secrets.WINGET_TOKEN != '' }}
+    if: needs.check-secrets.outputs.has_winget == 'true'
     steps:
       - uses: vedantmgoyal9/winget-releaser@main
         with:
