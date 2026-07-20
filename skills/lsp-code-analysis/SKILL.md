@@ -5,20 +5,6 @@ description: Code intelligence via LSP: definitions, references, outlines, docs,
 
 # LSP Code Analysis
 
-## Why this over grep/read
-
-The cost difference is the point, not a side benefit. `read <file>` charges for
-the whole file even when you want one 15-line function; `grep -r "X"` charges
-for every match including imports, comments, and unrelated variables sharing
-the name X, and text-pattern guessing then usually forces a second `read` to
-disambiguate what actually matched. `lsp symbol`/`lsp definition`/`lsp
-reference` skip both costs: they return the one symbol or the exact
-structurally-correct locations, nothing else to read through or filter.
-
-Default to `lsp` for definitions, references, outlines, docs, and diagnostics.
-Reach for `read`/`grep` only for literal string searches, comments, or content
-that isn't code at all (README prose, config values, log output).
-
 ## Prerequisites
 
 The `lsp` binary must be installed. Check with:
@@ -30,34 +16,21 @@ lsp --version
 If missing, install it:
 
 ```bash
-# Homebrew (macOS/Linux)
 brew install huyz0/tap/lsp-cli
-
-# no package manager
-curl -fsSL https://raw.githubusercontent.com/huyz0/lsp-cli/main/install.sh | sh
-
-# or download a prebuilt binary directly from
-# https://github.com/huyz0/lsp-cli/releases
 ```
 
-Or build it from source:
+No Homebrew: `curl -fsSL https://raw.githubusercontent.com/huyz0/lsp-cli/main/install.sh | sh`,
+or build from source with `cargo build --release` (binary at `./target/release/lsp`).
+
+Language servers are managed separately, per project language:
 
 ```bash
-cargo install --path <path-to-lsp-cli>
-# or, from inside the repo:
-cargo build --release   # binary at ./target/release/lsp
+lsp install --list      # see what's installed for every supported language
+lsp install typescript  # install one, e.g. TypeScript/JS
 ```
 
-Language servers are managed separately. Install the server for your language:
-
-```bash
-lsp install --list              # see what's installed
-lsp install typescript          # install TypeScript/JS server
-lsp install python              # install Python (basedpyright)
-lsp install go                  # install Go (gopls)
-lsp install java                # install Java (jdtls), requires a JDK already
-                                 # present (sdkman, $JAVA_HOME, or `java` on PATH)
-```
+Java additionally needs a JDK already on the machine (sdkman, `$JAVA_HOME`,
+or `java` on `PATH`); `lsp install java` won't install one for you.
 
 **Auto-start**: A language server starts automatically on the first navigation
 command and stays warm in a background daemon, reused across calls (even
@@ -194,7 +167,7 @@ Show running servers, their PID, and idle time.
 lsp server list
 ```
 
-## Schema & Introspection
+## Schema & introspection
 
 Agents can dynamically list commands and retrieve the exact JSON Schema for their input arguments using the `schema` command instead of relying on this documentation:
 
@@ -203,7 +176,7 @@ lsp schema              # list all endpoint schemas
 lsp schema definition   # show the input schema for `definition`
 ```
 
-## Locate Syntax
+## Locate syntax
 
 The `--scope` and `--find` options are shared across all navigation commands (`outline`, `definition`, `reference`, `doc`, `symbol`, `locate`):
 
@@ -240,7 +213,7 @@ lsp reference src/models.ts --scope User --max-items 20 --start-index 20 --pagin
 queries the LSP server fresh. There's no server-side cursor to invalidate,
 so re-running page 1 after other edits is safe.
 
-## Recommended Workflows
+## Recommended workflows
 
 ### Understanding an unfamiliar file
 
@@ -285,7 +258,7 @@ lsp definition src/service.ts --scope processData
 lsp reference src/service.ts --scope processData
 ```
 
-## Tool Selection Guide
+## Tool selection guide
 
 | Task | Traditional | Recommended |
 |------|-------------|-------------|
@@ -297,7 +270,7 @@ lsp reference src/service.ts --scope processData
 | Read a function | `read <file>` | `lsp symbol <file> --scope X` |
 | Find a class | `grep -r "class X"` | `lsp search "X" --kinds class` |
 
-**Rule**: Prefer `lsp` commands over `read`/`grep` for all code understanding tasks. Use `read`/`grep` only for literal string searches or comments.
+Exception: literal string searches, comments, and non-code content (README prose, config values, log output) still go through `read`/`grep`.
 
 ## Behavior notes
 
